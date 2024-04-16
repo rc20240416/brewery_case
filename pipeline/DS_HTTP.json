@@ -1,0 +1,17 @@
+{
+    "name": "DS_HTTP",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_HTTP",
+            "type": "LinkedServiceReference"
+        },
+        "annotations": [],
+        "type": "Json",
+        "typeProperties": {
+            "location": {
+                "type": "HttpServerLocation"
+            }
+        },
+        "schema": {}
+    }
+}
