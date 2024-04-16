@@ -1,0 +1,33 @@
+{
+    "name": "DS_ADLS_JSON",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "LS_ADLS_JSON",
+            "type": "LinkedServiceReference"
+        },
+        "parameters": {
+            "container": {
+                "type": "string"
+            },
+            "folder": {
+                "type": "string"
+            }
+        },
+        "annotations": [],
+        "type": "Json",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "folderPath": {
+                    "value": "@dataset().folder",
+                    "type": "Expression"
+                },
+                "fileSystem": {
+                    "value": "@dataset().container",
+                    "type": "Expression"
+                }
+            }
+        },
+        "schema": {}
+    }
+}
