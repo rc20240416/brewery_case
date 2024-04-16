@@ -1,0 +1,28 @@
+{
+    "name": "TG_api_to_db",
+    "properties": {
+        "annotations": [],
+        "runtimeState": "Started",
+        "pipelines": [
+            {
+                "pipelineReference": {
+                    "referenceName": "PL_API_to_DB",
+                    "type": "PipelineReference"
+                },
+                "parameters": {
+                    "url": "https://api.openbrewerydb.org/breweries",
+                    "conainer": "datalake"
+                }
+            }
+        ],
+        "type": "ScheduleTrigger",
+        "typeProperties": {
+            "recurrence": {
+                "frequency": "Hour",
+                "interval": 1,
+                "startTime": "2024-04-16T15:34:00Z",
+                "timeZone": "UTC"
+            }
+        }
+    }
+}
