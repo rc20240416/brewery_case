@@ -1,0 +1,12 @@
+{
+    "name": "LS_HTTP",
+    "properties": {
+        "annotations": [],
+        "type": "HttpServer",
+        "typeProperties": {
+            "url": "https://api.openbrewerydb.org/breweries",
+            "enableServerCertificateValidation": true,
+            "authenticationType": "Anonymous"
+        }
+    }
+}
