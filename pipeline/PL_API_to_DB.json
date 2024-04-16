@@ -1,0 +1,332 @@
+{
+    "name": "PL_API_to_DB",
+    "properties": {
+        "activities": [
+            {
+                "name": "Set processdate",
+                "type": "SetVariable",
+                "dependsOn": [],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "processdate",
+                    "value": {
+                        "value": "@formatDateTime(utcNow(), 'yyyyMMdd')",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Get API data",
+                "description": "Get data from API and save it as it is into raw folder",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "Set processdate",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.00:10:00",
+                    "retry": 1,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": true,
+                    "secureInput": true
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "JsonSource",
+                        "storeSettings": {
+                            "type": "HttpReadSettings",
+                            "requestMethod": "GET"
+                        },
+                        "formatSettings": {
+                            "type": "JsonReadSettings"
+                        }
+                    },
+                    "sink": {
+                        "type": "JsonSink",
+                        "storeSettings": {
+                            "type": "AzureBlobFSWriteSettings"
+                        },
+                        "formatSettings": {
+                            "type": "JsonWriteSettings"
+                        }
+                    },
+                    "enableStaging": false
+                },
+                "inputs": [
+                    {
+                        "referenceName": "DS_HTTP",
+                        "type": "DatasetReference"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "DS_ADLS_JSON",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "container": {
+                                "value": "@pipeline().parameters.conainer",
+                                "type": "Expression"
+                            },
+                            "folder": {
+                                "value": "@concat('bronze/',variables('processdate'))",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "Check folder",
+                "description": "If the folder don´t exist no need to start th cluster",
+                "type": "Validation",
+                "dependsOn": [
+                    {
+                        "activity": "Get API data",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "dataset": {
+                        "referenceName": "DS_ADLS_JSON",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "container": {
+                                "value": "@pipeline().parameters.conainer",
+                                "type": "Expression"
+                            },
+                            "folder": {
+                                "value": "@concat('bronze/',variables('processdate'))",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    "timeout": "0.00:00:30",
+                    "sleep": 10
+                }
+            },
+            {
+                "name": "NTB Load and Transform",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                    {
+                        "activity": "Check folder",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.00:10:00",
+                    "retry": 1,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "notebookPath": "/Users/ricardo.cauduro@outlook.com/NTB_Brewery_Medalion",
+                    "baseParameters": {
+                        "processdate": {
+                            "value": "@variables('processdate')",
+                            "type": "Expression"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_Databricks",
+                    "type": "LinkedServiceReference"
+                }
+            },
+            {
+                "name": "Erro Api",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "Get API data",
+                        "dependencyConditions": [
+                            "Failed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "erro",
+                    "value": {
+                        "value": "@string(activity('Get API data').output)",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "Erro NTB",
+                "type": "SetVariable",
+                "dependsOn": [
+                    {
+                        "activity": "NTB Load and Transform",
+                        "dependencyConditions": [
+                            "Failed"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "variableName": "erro",
+                    "value": {
+                        "value": "@string(activity('NTB Load and Transform').output)",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "log falha",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "Erro NTB",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    },
+                    {
+                        "activity": "Erro Api",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "0.00:10:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "storedProcedureName": "sp_log",
+                    "storedProcedureParameters": {
+                        "cod_Erro": {
+                            "value": {
+                                "value": "@variables('erro')",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "data_FimCarga": {
+                            "value": {
+                                "value": "@formatDateTime(utcnow(), 'yyyy-MM-dd HH:mm:ss.fff')",
+                                "type": "Expression"
+                            },
+                            "type": "DateTime"
+                        },
+                        "nome_Pipeline": {
+                            "value": {
+                                "value": "@pipeline().Pipeline",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "status_Carga": {
+                            "value": "falha",
+                            "type": "String"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_SQL",
+                    "type": "LinkedServiceReference"
+                }
+            },
+            {
+                "name": "log sucesso",
+                "type": "SqlServerStoredProcedure",
+                "dependsOn": [
+                    {
+                        "activity": "NTB Load and Transform",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "policy": {
+                    "timeout": "7.00:00:00",
+                    "retry": 0,
+                    "retryIntervalInSeconds": 30,
+                    "secureOutput": false,
+                    "secureInput": false
+                },
+                "userProperties": [],
+                "typeProperties": {
+                    "storedProcedureName": "sp_log",
+                    "storedProcedureParameters": {
+                        "cod_Erro": {
+                            "value": null,
+                            "type": "String"
+                        },
+                        "data_FimCarga": {
+                            "value": {
+                                "value": "@formatDateTime(addHours(utcnow(), -3), 'yyyy-MM-dd HH:mm:ss.fff')",
+                                "type": "Expression"
+                            },
+                            "type": "DateTime"
+                        },
+                        "nome_Pipeline": {
+                            "value": {
+                                "value": "@pipeline().Pipeline",
+                                "type": "Expression"
+                            },
+                            "type": "String"
+                        },
+                        "status_Carga": {
+                            "value": "sucesso",
+                            "type": "String"
+                        }
+                    }
+                },
+                "linkedServiceName": {
+                    "referenceName": "LS_SQL",
+                    "type": "LinkedServiceReference"
+                }
+            }
+        ],
+        "parameters": {
+            "url": {
+                "type": "string",
+                "defaultValue": "https://api.openbrewerydb.org/breweries"
+            },
+            "conainer": {
+                "type": "string",
+                "defaultValue": "datalake"
+            }
+        },
+        "variables": {
+            "processdate": {
+                "type": "String"
+            },
+            "erro": {
+                "type": "String"
+            }
+        },
+        "annotations": []
+    }
+}
